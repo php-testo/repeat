@@ -14,6 +14,12 @@
             "homepage": "https://github.com/roxblnfk"
         }
     ],
+    "funding": [
+        {
+            "type": "boosty",
+            "url": "https://boosty.to/roxblnfk"
+        }
+    ],
     "require": {
         "php": ">=8.2",
         "testo/testo": "*"
@@ -30,7 +36,7 @@
     "prefer-stable": true,
     "extra": {
         "branch-alias": {
-            "dev-1.x": "0.1.x-dev"
+            "dev-1.x": "1.x-dev"
         }
     }
 }
