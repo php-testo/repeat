@@ -11,12 +11,13 @@ use Testo\Testing\Attribute\TestingSuite;
 use Testo\Testing\Traits\TestRunner;
 use Tests\Repeat\Stub\RepeatClassLevelStub;
 use Tests\Repeat\Stub\RepeatFailingStub;
+use Tests\Repeat\Stub\RepeatFlakyStub;
 use Tests\Repeat\Stub\RepeatPassingStub;
 
+#[Test]
 #[TestingSuite(path: __DIR__ . '/../Stub')]
 final class RepeatFeatureTest
 {
-    #[Test]
     public function defaultRepeatPasses(): void
     {
         $result = TestRunner::runTest([RepeatPassingStub::class, 'defaultRepeat']);
@@ -24,7 +25,6 @@ final class RepeatFeatureTest
         Assert::same($result->status, Status::Passed);
     }
 
-    #[Test]
     public function repeatThreeTimesPasses(): void
     {
         $result = TestRunner::runTest([RepeatPassingStub::class, 'repeatThreeTimes']);
@@ -32,7 +32,6 @@ final class RepeatFeatureTest
         Assert::same($result->status, Status::Passed);
     }
 
-    #[Test]
     public function repeatOncePasses(): void
     {
         $result = TestRunner::runTest([RepeatPassingStub::class, 'repeatOnce']);
@@ -40,7 +39,6 @@ final class RepeatFeatureTest
         Assert::same($result->status, Status::Passed);
     }
 
-    #[Test]
     public function failsOnSecondIteration(): void
     {
         $result = TestRunner::runTest([RepeatFailingStub::class, 'failsOnSecondIteration']);
@@ -48,7 +46,6 @@ final class RepeatFeatureTest
         Assert::same($result->status, Status::Failed);
     }
 
-    #[Test]
     public function failsImmediately(): void
     {
         $result = TestRunner::runTest([RepeatFailingStub::class, 'failsImmediately']);
@@ -56,7 +53,6 @@ final class RepeatFeatureTest
         Assert::same($result->status, Status::Failed);
     }
 
-    #[Test]
     public function classLevelRepeatFirstTest(): void
     {
         $result = TestRunner::runTest([RepeatClassLevelStub::class, 'firstTest']);
@@ -64,10 +60,30 @@ final class RepeatFeatureTest
         Assert::same($result->status, Status::Passed);
     }
 
-    #[Test]
     public function classLevelRepeatSecondTest(): void
     {
         $result = TestRunner::runTest([RepeatClassLevelStub::class, 'secondTest']);
+
+        Assert::same($result->status, Status::Passed);
+    }
+
+    public function failureWithinThresholdMarksFlaky(): void
+    {
+        $result = TestRunner::runTest([RepeatFlakyStub::class, 'failureWithinThreshold']);
+
+        Assert::same($result->status, Status::Flaky);
+    }
+
+    public function failureExceedsThresholdFails(): void
+    {
+        $result = TestRunner::runTest([RepeatFlakyStub::class, 'failureExceedsThreshold']);
+
+        Assert::same($result->status, Status::Failed);
+    }
+
+    public function failureWithinThresholdStaysPassedWhenMarkFlakyIsFalse(): void
+    {
+        $result = TestRunner::runTest([RepeatFlakyStub::class, 'failureWithinThresholdNoFlakyMark']);
 
         Assert::same($result->status, Status::Passed);
     }
