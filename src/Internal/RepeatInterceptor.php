@@ -8,6 +8,7 @@ use Testo\Core\Context\TestInfo;
 use Testo\Core\Context\TestResult;
 use Testo\Core\Log\Level;
 use Testo\Core\Value\Status;
+use Testo\Core\Value\Summary;
 use Testo\Messenger;
 use Testo\Pipeline\Attribute\InterceptorOptions;
 use Testo\Pipeline\Middleware\TestRunInterceptor;
@@ -48,15 +49,21 @@ final readonly class RepeatInterceptor implements TestRunInterceptor
 
         $failures = 0;
 
+        # A repeated test still counts as one test, but every run does real work — accumulate the
+        # runs' summaries (their counts are empty here, so only assertions and duration carry over)
+        # and fold them into whichever result is returned.
+        $accumulated = new Summary();
+
         # Per-run status symbols accumulate here and are emitted into the parent scope in batches, so
         # the run line survives the (mostly dropped) per-run forks without a message+dispatch per run.
         $symbols = '';
         $lastFlush = \microtime(true);
-        $flush = function () use (&$symbols): void {
+        $flush = function (bool $eol) use (&$symbols): void {
             if ($symbols === '') {
                 return;
             }
-            $this->messenger->log(self::CHANNEL, $symbols, Level::Info);
+
+            $this->messenger->log(self::CHANNEL, $eol ? "$symbols\n" : $symbols, Level::Info);
             $symbols = '';
         };
 
@@ -70,35 +77,39 @@ final readonly class RepeatInterceptor implements TestRunInterceptor
                 holdEvents: true,
             );
 
+            $accumulated = $accumulated->merge($result->summary);
+
             $symbols .= self::symbol($result->status);
             $now = \microtime(true);
             if ($now - $lastFlush >= self::FLUSH_INTERVAL) {
-                $flush();
+                $flush(false);
                 $lastFlush = $now;
             }
 
             // Skipped / Cancelled / Aborted — abort immediately regardless of threshold.
             if (!$result->status->isCompleted()) {
-                $flush();
+                $flush(true);
                 $commit();
-                return $result;
+                return $result->withSummary($accumulated);
             }
 
             if ($result->status->isFailure() && ++$failures > $maxFailures) {
-                $flush();
+                $flush(true);
                 $commit();
-                return $result;
+                return $result->withSummary($accumulated);
             }
         } while (--$times > 0);
 
-        $flush();
+        $flush(true);
 
         # Keep the messages of the last run — the one whose result we return; earlier runs are dropped.
         $commit();
 
-        return $failures > 0 && $this->options->markFlaky
+        $result = $failures > 0 && $this->options->markFlaky
             ? $result->with(status: Status::Flaky)
             : $result;
+
+        return $result->withSummary($accumulated);
     }
 
     /**
